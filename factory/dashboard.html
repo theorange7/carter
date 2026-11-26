@@ -1,0 +1,925 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark">
+<title>Factory jobs</title>
+<style>
+  :root {
+    --bg:#14151b; --panel:#1a1c24; --card:#20222c; --line:#2b2e3b; --text:#e4e5ea;
+    --muted:#868ba0; --faint:#5b6075; --active:#8be9fd; --pass:#50fa7b; --changes:#ffb86c;
+    --stop:#ff5555; --human:#ff79c6; --merged:#bd93f9; --warn:#f1fa8c;
+    --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+  * { box-sizing:border-box; }
+  html { background:var(--bg); }
+  body { margin:0; min-height:100vh; display:flex; flex-direction:column; background:var(--bg); color:var(--text);
+         font:14px/1.45 -apple-system, system-ui, sans-serif; overflow-wrap:anywhere; }
+  :focus-visible { outline:2px solid var(--active); outline-offset:2px; }
+  a { color:var(--active); }
+  code, .mono { font-family:var(--mono); }
+  .sr { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; }
+  .empty { color:var(--faint); font-size:13px; margin:4px 0; }
+
+  /* Header and status line */
+  header.top { display:flex; align-items:center; gap:10px 16px; padding:12px 20px; border-bottom:1px solid var(--line);
+               background:var(--panel); flex-wrap:wrap; }
+  header.top h1 { font-size:15px; margin:0; letter-spacing:.02em; }
+  .pill { font:12px var(--mono); padding:2px 8px; border-radius:99px; border:1px solid var(--line); color:var(--muted); white-space:nowrap; }
+  #status { margin-left:auto; }
+  #status.ok { color:var(--pass); border-color:#2f5a3a; }
+  #status.err { color:var(--stop); border-color:#5a2f2f; white-space:normal; }
+
+  /* Warnings for jobs that cannot go on the board */
+  #warnings:empty { display:none; }
+  #warnings { background:#33331f; color:var(--warn); border-bottom:1px solid #5a5a2f; padding:8px 20px; font-size:13px; }
+  #warnings ul { margin:0; padding-left:18px; }
+  button.link { background:none; border:0; padding:0; font:inherit; color:var(--active); cursor:pointer; text-decoration:underline; }
+
+  /* Board */
+  main.board { flex:1; display:grid; gap:12px; padding:16px 20px; align-items:start;
+               grid-template-columns:repeat(10, minmax(0, 1fr)); }
+  .column { min-width:0; display:grid; gap:8px; }
+  .column h2 { display:flex; justify-content:space-between; align-items:baseline; gap:6px; margin:0 0 2px; padding-bottom:6px;
+               border-bottom:1px solid var(--line); font-size:12px; text-transform:uppercase; letter-spacing:.08em;
+               color:var(--muted); font-weight:600; }
+  .column h2 .count { font:11px var(--mono); color:var(--faint); }
+  .col-needs-human h2 { color:var(--human); }
+
+  /* Cards: the title is a real button stretched over the whole card */
+  .card { position:relative; background:var(--card); border:1px solid var(--line); border-radius:8px; padding:10px 12px;
+          display:grid; gap:6px; min-width:0; }
+  .card:hover { border-color:#3b3f52; }
+  .card-open { all:unset; display:grid; gap:2px; cursor:pointer; min-width:0; }
+  .card-open::after { content:""; position:absolute; inset:0; border-radius:8px; }
+  .card-open:focus-visible { outline:none; }
+  .card-open:focus-visible::after { outline:2px solid var(--active); outline-offset:2px; }
+  .card-id { font:12px var(--mono); color:var(--muted); }
+  .card-id .num { color:var(--text); }
+  .feature { font-weight:600; line-height:1.3; }
+  .meta { display:flex; flex-wrap:wrap; gap:4px 8px; align-items:center; font:11px var(--mono); color:var(--muted); }
+  .branch { color:var(--faint); }
+  .tag { font:10px var(--mono); padding:0 6px; border-radius:99px; border:1px solid #4a3f66; color:var(--merged); }
+  .live { color:var(--active); display:inline-flex; align-items:center; gap:5px; }
+  .live .dot { width:7px; height:7px; border-radius:50%; background:var(--active); animation:pulse 1.4s infinite; }
+  @keyframes pulse { 50% { opacity:.35; } }
+
+  .rounds { list-style:none; margin:0; padding:0; display:grid; gap:3px; }
+  .round { display:flex; flex-wrap:wrap; gap:3px; align-items:center; }
+  .round-n { font:10px var(--mono); color:var(--faint); width:18px; }
+  .chip { font:11px var(--mono); padding:0 5px; border-radius:4px; border:1px solid var(--line); white-space:nowrap; color:var(--faint); }
+  .round .chip { font-size:10px; padding:0 3px; white-space:normal; overflow-wrap:anywhere; }
+  .v-PASS { color:var(--pass); border-color:#2f5a3a; }
+  .v-CHANGES { color:var(--changes); border-color:#5a452f; }
+  .v-waiting { color:var(--active); border-style:dashed; border-color:#2f4f5a; animation:pulse 2.4s infinite; }
+  .v-missing { color:var(--stop); border-style:dotted; border-color:#5a2f2f; }
+  .v-malformed { color:var(--warn); border-style:dotted; border-color:#5a5a2f; }
+
+  .human-box { position:relative; z-index:1; display:grid; gap:4px; font-size:12px; }
+  .reason { margin:0; color:var(--human); }
+  .human-box code { display:block; font-size:11px; background:var(--panel); border:1px solid var(--line); border-radius:4px;
+                    padding:2px 6px; user-select:all; }
+  .s-needs-human.card { border-color:var(--human); box-shadow:0 0 0 1px #5a2f45 inset; }
+  .s-merged.card, .s-concluded.card, .s-cancelled.card { opacity:.6; }
+  .s-merged.card:hover, .s-concluded.card:hover, .s-cancelled.card:hover,
+  .s-merged.card:focus-within, .s-concluded.card:focus-within, .s-cancelled.card:focus-within { opacity:1; }
+  .answer { font:11px var(--mono); letter-spacing:.06em; color:var(--text); }
+  .s-cancelled .feature { text-decoration:line-through; text-decoration-color:var(--faint); }
+
+  .stage { font:11px var(--mono); text-transform:uppercase; letter-spacing:.06em; color:var(--active); }
+  .stage.s-needs-human { color:var(--human); } .stage.s-merged, .stage.s-pr-opened { color:var(--merged); } .stage.s-concluded { color:var(--pass); }
+  .stage.s-cancelled { color:var(--faint); } .stage.s-unknown { color:var(--warn); }
+
+  /* Footer */
+  footer { border-top:1px solid var(--line); background:var(--panel); padding:10px 20px; font-size:12px; color:var(--muted);
+           display:grid; gap:6px; }
+  footer ul { list-style:none; margin:0; padding:0; display:flex; flex-wrap:wrap; gap:6px 16px; }
+  footer code { color:var(--text); }
+
+  /* Detail panel */
+  .panel { position:fixed; top:0; right:0; bottom:0; width:min(780px, 100vw); z-index:10; background:var(--panel);
+           border-left:1px solid var(--line); box-shadow:-12px 0 32px rgba(0,0,0,.45);
+           display:grid; grid-template-rows:auto minmax(0, 1fr); }
+  .panel[hidden] { display:none; }
+  .panel-head { display:flex; gap:12px; align-items:flex-start; padding:14px 16px; border-bottom:1px solid var(--line); }
+  #panel-head-body { flex:1; min-width:0; display:grid; gap:4px; }
+  #panel-title { margin:0; font:600 14px var(--mono); }
+  .panel-head p { margin:0; }
+  .panel-head .feature { font-size:15px; }
+  .icon { flex:none; width:32px; height:32px; border-radius:6px; border:1px solid var(--line); background:var(--card);
+          color:var(--muted); font-size:18px; line-height:1; cursor:pointer; }
+  .icon:hover { color:var(--text); }
+  .panel-body { display:grid; grid-template-columns:210px minmax(0, 1fr); min-height:0; }
+  .files { border-right:1px solid var(--line); padding:10px; overflow:auto; }
+  .files h3 { font-size:11px; text-transform:uppercase; letter-spacing:.08em; color:var(--muted); margin:10px 0 4px; font-weight:600; }
+  .files ul { list-style:none; margin:0; padding:0; display:grid; gap:2px; }
+  .file { all:unset; box-sizing:border-box; width:100%; display:flex; align-items:center; gap:8px; padding:4px 8px;
+          border-radius:6px; font:12px var(--mono); color:var(--muted); cursor:pointer; }
+  .file:hover { color:var(--text); background:var(--card); }
+  .file[aria-current="true"] { color:var(--text); background:var(--card); box-shadow:inset 2px 0 0 var(--active); }
+  .file:focus-visible { outline:2px solid var(--active); outline-offset:-2px; }
+  .dot { flex:none; width:8px; height:8px; border-radius:50%; background:var(--faint); }
+  .tone-good { --tone:var(--pass); } .tone-warn { --tone:var(--changes); } .tone-stop { --tone:var(--stop); }
+  .dot.tone-good, .dot.tone-warn, .dot.tone-stop { background:var(--tone); }
+  .viewer { overflow:auto; padding:16px 20px 40px; min-width:0; }
+
+  /* Rendered markdown */
+  .md { line-height:1.55; }
+  .md h1, .md h2, .md h3, .md h4, .md h5, .md h6 { margin:1.2em 0 .5em; line-height:1.3; }
+  .md h1 { font-size:20px; } .md h2 { font-size:17px; } .md h3 { font-size:15px; }
+  .md h4, .md h5, .md h6 { font-size:14px; color:var(--muted); }
+  .md > :first-child { margin-top:0; }
+  .md p, .md ul, .md ol, .md blockquote, .md pre, .md .table-wrap { margin:0 0 .8em; }
+  .md ul, .md ol { padding-left:22px; }
+  .md li > ul, .md li > ol { margin:0; }
+  .md li.task { list-style:none; margin-left:-20px; }
+  .md li.task input { margin:0 6px 0 0; vertical-align:-1px; }
+  .md code { font-size:12px; background:var(--card); border:1px solid var(--line); border-radius:4px; padding:0 4px; }
+  .md pre { background:var(--bg); border:1px solid var(--line); border-radius:8px; padding:10px 12px; overflow:auto; }
+  .md pre code { background:none; border:0; padding:0; font:12px/1.5 var(--mono); white-space:pre; }
+  .md blockquote { border-left:3px solid var(--line); padding:2px 0 2px 12px; color:var(--muted); }
+  .md hr { border:0; border-top:1px solid var(--line); margin:1.2em 0; }
+  .md .table-wrap { overflow-x:auto; }
+  .md table { border-collapse:collapse; }
+  .md th, .md td { text-align:left; padding:5px 8px; border:1px solid var(--line); vertical-align:top; }
+  .md th { background:var(--card); font-weight:600; }
+  .evidence figure { margin:0 0 16px; }
+  .evidence img, .evidence video { display:block; max-width:100%; height:auto; background:var(--bg); border:1px solid var(--line); border-radius:8px; }
+  .evidence figcaption { margin-top:4px; font:12px var(--mono); color:var(--muted); }
+  .badge { display:inline-block; font:600 12px var(--mono); letter-spacing:.04em; padding:3px 10px; border-radius:99px;
+           border:1px solid var(--tone); color:var(--tone); margin:0 0 12px; }
+
+  /* Narrow screens: fewer columns, then one; the panel goes full screen */
+  @media (max-width:1599px) { main.board { grid-template-columns:repeat(5, minmax(0, 1fr)); } }
+  @media (max-width:899px)  { main.board { grid-template-columns:repeat(2, minmax(0, 1fr)); } }
+  @media (max-width:599px) {
+    main.board { grid-template-columns:minmax(0, 1fr); }
+    header.top, main.board, footer, #warnings { padding-left:12px; padding-right:12px; }
+    #status { margin-left:0; }
+    .panel { width:100vw; border-left:0; }
+    .panel-body { grid-template-columns:minmax(0, 1fr); grid-template-rows:auto minmax(0, 1fr); }
+    .files { border-right:0; border-bottom:1px solid var(--line); max-height:32vh; }
+    .viewer { padding:12px 12px 32px; }
+  }
+  @media (prefers-reduced-motion:reduce) {
+    *, *::before, *::after { animation:none !important; transition:none !important; }
+  }
+</style>
+</head>
+<body>
+<header class="top">
+  <h1>Factory jobs</h1>
+  <span class="pill" id="total">…</span>
+  <span class="pill" id="status">Loading…</span>
+</header>
+<div id="warnings" role="status"></div>
+<main class="board" id="board" aria-label="Jobs by stage"></main>
+<footer>
+  <ul aria-label="Commands">
+    <li><code>/factory &lt;feature&gt;</code> start a job</li>
+    <li><code>/factory next</code> build the next backlog item</li>
+    <li><code>/factory spec &lt;inbox-file&gt;</code> build a finished inbox Spec</li>
+    <li><code>/factory approve &lt;job-id&gt;</code> merge a needs-human job</li>
+    <li><code>/factory rework &lt;job-id&gt; &lt;note&gt;</code> send it back with a note</li>
+  </ul>
+  <ul aria-label="Verdict key">
+    <li><span class="chip v-PASS">✓</span> pass</li>
+    <li><span class="chip v-CHANGES">✗</span> changes</li>
+    <li><span class="chip v-waiting">◌</span> waiting</li>
+    <li><span class="chip">○</span> pending</li>
+    <li><span class="chip v-missing">∅</span> file missing</li>
+    <li><span class="chip v-malformed">?</span> unreadable verdict</li>
+  </ul>
+</footer>
+<aside class="panel" id="panel" hidden aria-labelledby="panel-title">
+  <div class="panel-head">
+    <div id="panel-head-body"></div>
+    <button type="button" class="icon" id="panel-close" aria-label="Close job detail">×</button>
+  </div>
+  <div class="panel-body">
+    <nav class="files" id="panel-files" aria-label="Job files"></nav>
+    <div class="viewer" id="panel-viewer" tabindex="0" aria-label="File contents"></div>
+  </div>
+</aside>
+<script>
+"use strict";
+
+// Factory jobs board. Served from the repo's factory/ folder by
+// python3 -m http.server, so every URL here is relative to that folder.
+// Everything read from job.json or a markdown file is escaped before it
+// reaches HTML.
+
+const POLL_MS = 2000;
+const STAGES = [
+  ["spec", "Spec"], ["build", "Build"], ["review", "Review"], ["approve", "Approve"],
+  ["approved", "Approved"], ["pr-opened", "PR opened"],
+  ["merged", "Merged"], ["concluded", "Concluded"], ["needs-human", "Needs human"], ["cancelled", "Cancelled"],
+];
+const STAGE_KEYS = STAGES.map(([key]) => key);
+const LIVE_STAGES = ["spec", "build", "review", "approve"];
+// The core Lenses, which come first in this order; extra Lenses follow.
+const CORE_LENSES = ["security", "ux", "ui", "code"];
+const LENS_SHORT = { security: "sec", ux: "ux", ui: "ui", code: "code" };
+const REVIEW_FILE = /^review-([a-z0-9]+(?:-[a-z0-9]+)*)\.md$/;
+// A round's evidence/<key>/ folder holds a Lens's index.md and captures;
+// only names that EVIDENCE_FILE allows are shown, at most EVIDENCE_MAX.
+const LENS_KEY = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+const EVIDENCE_FILE = /^[a-z0-9]+(?:-[a-z0-9]+)*\.(?:png|jpg|webm|mp4)$/;
+const EVIDENCE_MAX = 12;
+// First-line tokens and their tone.
+const TONES = {
+  "VERDICT: PASS": "good", "STATUS: READY": "good", "APPROVE": "good",
+  "VERDICT: CHANGES": "warn",
+  "STATUS: BLOCKED": "stop", "ESCALATE": "stop",
+};
+const VERDICT_MARK = { PASS: "✓", CHANGES: "✗", pending: "○", waiting: "◌", missing: "∅", malformed: "?", loading: "…" };
+const VERDICT_TEXT = {
+  PASS: "pass", CHANGES: "changes requested", pending: "pending", waiting: "waiting for review",
+  missing: "review file missing", malformed: "unreadable verdict", loading: "loading",
+};
+// A job.json ci result as the verdict whose mark and tone its chip takes,
+// and its own text.
+const CI_VERDICT = { PASS: "PASS", FAIL: "CHANGES", pending: "waiting" };
+const CI_TEXT = { PASS: "pass", FAIL: "failed", pending: "waiting for CI" };
+// A job.json that has never parsed is only reported after this many polls,
+// so a file caught mid-rewrite never flashes a warning.
+const UNREADABLE_AFTER = 3;
+
+// id -> { job, failures, rounds: Map(n -> { lenses, verdicts, final }), answer }
+const jobs = new Map();
+const view = { lastOk: null, error: null };
+// The job open in the side panel.
+const detail = { id: null, path: null, files: [], texts: new Map(), loaded: false, viewerKey: "" };
+
+const $ = id => document.getElementById(id);
+const boardEl = $("board"), warningsEl = $("warnings"), statusEl = $("status"), totalEl = $("total");
+const panelEl = $("panel"), headEl = $("panel-head-body"), filesEl = $("panel-files"), viewerEl = $("panel-viewer");
+
+// ---------- helpers ----------
+
+function esc(value) {
+  return String(value).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+}
+
+function unesc(value) {
+  return value.replace(/&(amp|lt|gt|quot|#39);/g, (_, e) => ({ amp: "&", lt: "<", gt: ">", quot: '"', "#39": "'" })[e]);
+}
+
+function firstLine(text) {
+  return text.replace(/^﻿/, "").split(/\r?\n/, 1)[0].trim();
+}
+
+function toneOf(text) {
+  return typeof text === "string" ? TONES[firstLine(text)] || "" : "";
+}
+
+// orderLenses puts the core Lenses first, in their order, then the rest as
+// given.
+function orderLenses(keys) {
+  return CORE_LENSES.filter(lens => keys.includes(lens)).concat(keys.filter(lens => !CORE_LENSES.includes(lens)));
+}
+
+function jobUrl(id) {
+  return "jobs/" + encodeURIComponent(id) + "/";
+}
+
+// fetchText returns the body, or null for a 404, and throws on other failures.
+async function fetchText(url) {
+  const res = await fetch(url, { cache: "no-store" });
+  if (res.status === 404) return null;
+  if (!res.ok) throw new Error("HTTP " + res.status + " for " + url);
+  return res.text();
+}
+
+// listDir parses http.server's directory listing into { name, isDir } entries,
+// or returns null when the directory does not exist.
+async function listDir(url) {
+  const html = await fetchText(url);
+  if (html === null) return null;
+  const doc = new DOMParser().parseFromString(html, "text/html");
+  const entries = [];
+  for (const a of doc.querySelectorAll("a[href]")) {
+    let name;
+    try { name = decodeURIComponent(a.getAttribute("href")); } catch { continue; }
+    const isDir = name.endsWith("/");
+    if (isDir) name = name.slice(0, -1);
+    if (!name || name.includes("/") || name.startsWith(".")) continue;
+    entries.push({ name, isDir });
+  }
+  return entries;
+}
+
+// Highest job number first; ids without a number go last.
+function compareIds(a, b) {
+  const num = id => (/^\d+/.test(id) ? parseInt(id, 10) : -1);
+  return num(b) - num(a) || b.localeCompare(a);
+}
+
+// setHtml replaces a node's HTML only when it changed, and puts focus back
+// on the element with the same data-key, so polling never steals focus.
+function setHtml(node, html) {
+  if (node.lastHtml === html) return;
+  const active = document.activeElement;
+  const key = node.contains(active) && active.dataset ? active.dataset.key : null;
+  node.innerHTML = html;
+  node.lastHtml = html;
+  if (key) {
+    const again = node.querySelector('[data-key="' + CSS.escape(key) + '"]');
+    if (again) again.focus({ preventScroll: true });
+  }
+}
+
+function setText(node, text, className) {
+  if (node.textContent !== text) node.textContent = text;
+  if (className !== undefined && node.className !== className) node.className = className;
+}
+
+// ---------- data ----------
+
+// parseJob returns a normalised job, or null when the file is missing or
+// not valid JSON (it may be mid-rewrite).
+function parseJob(text) {
+  if (text === null) return null;
+  let raw;
+  try { raw = JSON.parse(text); } catch { return null; }
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
+  const str = v => (typeof v === "string" ? v : "");
+  const reviews = raw.reviews && typeof raw.reviews === "object" && !Array.isArray(raw.reviews) ? raw.reviews : {};
+  const lenses = orderLenses(Object.keys(reviews));
+  return {
+    feature: str(raw.feature),
+    branch: str(raw.branch),
+    stage: str(raw.stage),
+    reason: str(raw.reason),
+    origin: str(raw.origin),
+    kind: str(raw.kind),
+    ci: str(raw.ci),
+    round: Number.isInteger(raw.round) && raw.round > 0 ? Math.min(raw.round, 99) : 0,
+    lenses,
+    reviews: Object.fromEntries(lenses.map(lens => [lens, str(reviews[lens])])),
+  };
+}
+
+async function refreshJob(id) {
+  let entry = jobs.get(id);
+  if (!entry) {
+    entry = { job: null, failures: 0, rounds: new Map() };
+    jobs.set(id, entry);
+  }
+  const job = parseJob(await fetchText(jobUrl(id) + "job.json"));
+  if (job) {
+    entry.job = job;
+    entry.failures = 0;
+  } else {
+    entry.failures++; // keep the last good copy
+  }
+  if (!entry.job) return;
+  // A spike's ANSWER is the first line of findings.md.
+  if (entry.job.kind === "spike") entry.answer = answerOf(await fetchText(jobUrl(id) + "findings.md"));
+  await refreshRounds(id, entry);
+}
+
+// answerOf is the word after "ANSWER: " on a findings.md's first line, or ""
+// when that line is not one of the four.
+function answerOf(text) {
+  const m = typeof text === "string" ? /^ANSWER: (yes|no|partly|inconclusive)$/.exec(firstLine(text)) : null;
+  return m ? m[1] : "";
+}
+
+// Earlier rounds come from the review-<key>.md files listed in each
+// round-<n>/ folder. A round whose verdicts are all valid never changes, so
+// it is not fetched again.
+async function refreshRounds(id, entry) {
+  const wanted = [];
+  for (let n = 1; n < entry.job.round; n++) {
+    const known = entry.rounds.get(n);
+    if (!known || !known.final) wanted.push(n);
+  }
+  await Promise.all(wanted.map(async n => {
+    const listing = await listDir(jobUrl(id) + "round-" + n + "/");
+    const lenses = orderLenses(roundLenses(listing || []));
+    const verdicts = await Promise.all(lenses.map(lens => reviewVerdict(id, n, lens)));
+    entry.rounds.set(n, { lenses, verdicts, final: listing !== null && verdicts.every(v => v === "PASS" || v === "CHANGES") });
+  }));
+}
+
+// roundLenses is the Lens keys of a round folder's review-<key>.md files.
+function roundLenses(entries) {
+  return entries.filter(e => !e.isDir).map(e => REVIEW_FILE.exec(e.name)).filter(Boolean).map(m => m[1]);
+}
+
+async function reviewVerdict(id, n, lens) {
+  const text = await fetchText(jobUrl(id) + "round-" + n + "/review-" + lens + ".md");
+  if (text === null) return "missing";
+  const m = /^VERDICT: (PASS|CHANGES)$/.exec(firstLine(text));
+  return m ? m[1] : "malformed";
+}
+
+// refreshDetail lists the open job's files in display order and loads them.
+async function refreshDetail() {
+  const id = detail.id;
+  const base = jobUrl(id);
+  const entries = (await listDir(base)) || [];
+  const names = new Set(entries.filter(e => !e.isDir).map(e => e.name));
+  const files = [];
+  const entry = jobs.get(id);
+  const spike = entry && entry.job && entry.job.kind === "spike";
+  for (const name of spike ? ["spec.md", "findings.md"] : ["spec.md", "build.md", "decision.md"]) {
+    if (names.has(name)) files.push({ path: name, label: name, round: 0 });
+  }
+  const reworks = [...names].map(n => /^rework-(\d+)\.md$/.exec(n)).filter(Boolean).sort((a, b) => a[1] - b[1]);
+  for (const m of reworks) files.push({ path: m[0], label: m[0], round: 0 });
+
+  const rounds = entries.filter(e => e.isDir).map(e => /^round-(\d+)$/.exec(e.name)).filter(Boolean)
+    .map(m => ({ dir: m[0], n: Number(m[1]) })).sort((a, b) => a.n - b.n);
+  const listings = await Promise.all(rounds.map(r => listDir(base + encodeURIComponent(r.dir) + "/")));
+  const evidence = await Promise.all(rounds.map((r, i) => roundEvidence(base, r.dir, listings[i] || [])));
+  rounds.forEach((r, i) => {
+    for (const lens of orderLenses(roundLenses(listings[i] || []))) {
+      const name = "review-" + lens + ".md";
+      files.push({ path: r.dir + "/" + name, label: name, round: r.n });
+    }
+    for (const ev of evidence[i]) {
+      files.push({ path: r.dir + "/evidence/" + ev.key + "/", label: "evidence/" + ev.key, round: r.n, key: ev.key, captures: ev.captures });
+    }
+  });
+
+  // An evidence entry's text is its index.md; its captures load in the viewer.
+  const texts = await Promise.all(files.map(f => fetchText(base + (f.captures ? f.path + "index.md" : f.path).split("/").map(encodeURIComponent).join("/"))));
+  if (detail.id !== id) return; // the panel moved on while we were fetching
+  detail.files = files;
+  detail.texts = new Map(files.map((f, i) => [f.path, texts[i]]));
+  detail.loaded = true;
+}
+
+// roundEvidence is a round folder's evidence/<key>/ folders in Lens order,
+// each with its capture names, sorted and at most EVIDENCE_MAX.
+async function roundEvidence(base, dir, entries) {
+  if (!entries.some(e => e.isDir && e.name === "evidence")) return [];
+  const url = base + encodeURIComponent(dir) + "/evidence/";
+  const keys = orderLenses(((await listDir(url)) || []).filter(e => e.isDir && LENS_KEY.test(e.name)).map(e => e.name));
+  return Promise.all(keys.map(async key => {
+    const listing = (await listDir(url + encodeURIComponent(key) + "/")) || [];
+    const captures = listing.filter(e => !e.isDir && EVIDENCE_FILE.test(e.name)).map(e => e.name).sort().slice(0, EVIDENCE_MAX);
+    return { key, captures };
+  }));
+}
+
+async function poll() {
+  if (!document.hidden) {
+    try {
+      const entries = await listDir("jobs/"); // null: no jobs/ folder yet, an empty board
+      const ids = entries ? entries.filter(e => e.isDir).map(e => e.name) : [];
+      for (const id of [...jobs.keys()]) if (!ids.includes(id)) jobs.delete(id);
+      await Promise.all(ids.map(refreshJob));
+      if (detail.id) await refreshDetail();
+      view.lastOk = new Date();
+      view.error = null;
+    } catch (err) {
+      view.error = (err && err.message) || String(err);
+    }
+    render();
+  }
+  setTimeout(poll, POLL_MS);
+}
+
+// ---------- board ----------
+
+function render() {
+  renderStatus();
+  renderWarnings();
+  renderBoard();
+  renderDetail();
+}
+
+function renderStatus() {
+  const time = view.lastOk ? view.lastOk.toLocaleTimeString() : "never";
+  if (view.error) setText(statusEl, "Refresh failed: " + view.error + " · last update " + time, "pill err");
+  else if (view.lastOk) setText(statusEl, "Updated " + time, "pill ok");
+  const count = [...jobs.values()].filter(e => e.job).length;
+  setText(totalEl, count + (count === 1 ? " job" : " jobs"));
+}
+
+function renderWarnings() {
+  const items = [];
+  for (const id of [...jobs.keys()].sort(compareIds)) {
+    const entry = jobs.get(id);
+    if (entry.job && !STAGE_KEYS.includes(entry.job.stage)) {
+      items.push('<li>Job <button type="button" class="link" data-open="' + esc(id) + '" data-key="warn:' + esc(id) + '">'
+        + esc(id) + '</button> has an unknown stage <code>' + esc(entry.job.stage || "(none)") + '</code> and is not on the board.</li>');
+    } else if (!entry.job && entry.failures >= UNREADABLE_AFTER) {
+      items.push('<li><code>jobs/' + esc(id) + '/job.json</code> is missing or not valid JSON; still retrying.</li>');
+    }
+  }
+  setHtml(warningsEl, items.length ? "<ul>" + items.join("") + "</ul>" : "");
+}
+
+function renderBoard() {
+  const ids = [...jobs.keys()].sort(compareIds);
+  const html = STAGES.map(([key, label]) => {
+    const cards = ids.filter(id => jobs.get(id).job && jobs.get(id).job.stage === key).map(id => cardHtml(id, jobs.get(id).job, jobs.get(id)));
+    return '<section class="column col-' + key + '" aria-labelledby="col-' + key + '">'
+      + '<h2 id="col-' + key + '">' + label + ' <span class="count">' + cards.length + '</span></h2>'
+      + (cards.join("") || '<p class="empty">No jobs</p>')
+      + '</section>';
+  }).join("");
+  setHtml(boardEl, html);
+}
+
+function cardHtml(id, job, entry) {
+  const m = /^(\d+)-(.+)$/.exec(id);
+  const num = m ? m[1] : "";
+  const slug = m ? m[2] : id;
+  const meta = [];
+  if (job.branch) meta.push('<span class="branch" title="Branch">' + esc(job.branch) + '</span>');
+  if (job.origin === "autonomous") meta.push('<span class="tag">autonomous</span>');
+  if (LIVE_STAGES.includes(job.stage)) meta.push('<span class="live"><span class="dot" aria-hidden="true"></span>running</span>');
+  return '<article class="card s-' + esc(job.stage) + '">'
+    + '<button type="button" class="card-open" data-open="' + esc(id) + '" data-key="card:' + esc(id) + '">'
+    + '<span class="card-id">' + (num ? '<span class="num">' + esc(num) + '</span> ' : '') + esc(slug) + '</span>'
+    + '<span class="feature">' + esc(job.feature || "(no title)") + '</span>'
+    + '</button>'
+    + (meta.length ? '<div class="meta">' + meta.join("") + '</div>' : '')
+    + (entry.answer ? '<div class="answer">ANSWER: ' + esc(entry.answer) + '</div>' : '')
+    + roundsHtml(job, entry)
+    + (job.stage === "needs-human" ? humanHtml(id, job) : '')
+    + '</article>';
+}
+
+// One row of verdicts per round, one per Lens; the current round is from
+// job.json, with its CI result first when it has one.
+function roundsHtml(job, entry) {
+  if (!job.round) return "";
+  const rows = [];
+  for (let n = 1; n <= job.round; n++) {
+    let lenses, verdicts;
+    if (n === job.round) {
+      lenses = job.lenses;
+      verdicts = lenses.map(lens => currentVerdict(job, lens));
+    } else if (entry.rounds.has(n)) {
+      ({ lenses, verdicts } = entry.rounds.get(n));
+    } else {
+      lenses = job.kind === "spike" ? ["spike"] : CORE_LENSES;
+      verdicts = lenses.map(() => "loading");
+    }
+    rows.push('<li class="round"><span class="round-n" aria-label="Round ' + n + '">R' + n + '</span>'
+      + (n === job.round && job.ci ? ciChipHtml(job.ci) : '')
+      + verdicts.map((v, i) => chipHtml(lenses[i], v)).join("") + '</li>');
+  }
+  return '<ul class="rounds" aria-label="Review verdicts">' + rows.join("") + '</ul>';
+}
+
+function currentVerdict(job, lens) {
+  const v = job.reviews[lens];
+  if (v === "PASS" || v === "CHANGES") return v;
+  if (v === "pending") return job.stage === "review" ? "waiting" : "pending";
+  return "malformed";
+}
+
+function chipHtml(lens, v) {
+  return '<span class="chip v-' + v + '" title="' + esc(lens) + ': ' + VERDICT_TEXT[v] + '">' + esc(Object.hasOwn(LENS_SHORT, lens) ? LENS_SHORT[lens] : lens)
+    + '<span aria-hidden="true">' + VERDICT_MARK[v] + '</span><span class="sr"> ' + esc(lens) + ' ' + VERDICT_TEXT[v] + '</span></span>';
+}
+
+// ciChipHtml is chipHtml for a ci result; an unknown one is malformed.
+function ciChipHtml(ci) {
+  const v = Object.hasOwn(CI_VERDICT, ci) ? CI_VERDICT[ci] : "malformed";
+  const text = Object.hasOwn(CI_TEXT, ci) ? CI_TEXT[ci] : VERDICT_TEXT.malformed;
+  return '<span class="chip v-' + v + '" title="ci: ' + text + '">ci'
+    + '<span aria-hidden="true">' + VERDICT_MARK[v] + '</span><span class="sr"> ci ' + text + '</span></span>';
+}
+
+function humanHtml(id, job) {
+  return '<div class="human-box">'
+    + (job.reason ? '<p class="reason">' + esc(job.reason) + '</p>' : '')
+    + '<code>/factory approve ' + esc(id) + '</code>'
+    + '<code>/factory rework ' + esc(id) + ' &lt;note&gt;</code>'
+    + '</div>';
+}
+
+// ---------- detail panel ----------
+
+function renderDetail() {
+  if (!detail.id) return;
+  const entry = jobs.get(detail.id);
+  setHtml(headEl, headHtml(detail.id, entry && entry.job));
+  if (detail.loaded && !detail.files.some(f => f.path === detail.path)) {
+    detail.path = detail.files.length ? detail.files[0].path : null;
+  }
+  setHtml(filesEl, detail.loaded ? filesHtml() : '<p class="empty">Loading…</p>');
+  renderViewer();
+}
+
+function headHtml(id, job) {
+  const parts = ['<h2 id="panel-title" tabindex="-1">' + esc(id) + '</h2>'];
+  if (job) {
+    const known = STAGE_KEYS.includes(job.stage);
+    parts.push('<p class="feature">' + esc(job.feature || "(no title)") + '</p>');
+    parts.push('<p class="meta"><span class="stage s-' + (known ? job.stage : "unknown") + '">' + esc(job.stage || "(none)") + '</span>'
+      + '<span>round ' + job.round + '</span>'
+      + (job.branch ? '<span class="branch">' + esc(job.branch) + '</span>' : '')
+      + (job.origin === "autonomous" ? '<span class="tag">autonomous</span>' : '') + '</p>');
+    if (job.reason) parts.push('<p class="reason">' + esc(job.reason) + '</p>');
+  }
+  return parts.join("");
+}
+
+function filesHtml() {
+  if (!detail.files.length) return '<p class="empty">No files yet.</p>';
+  let html = "";
+  let group = -1;
+  for (const f of detail.files) {
+    if (f.round !== group) {
+      if (group !== -1) html += "</ul>";
+      html += (f.round ? "<h3>Round " + f.round + "</h3>" : "") + "<ul>";
+      group = f.round;
+    }
+    const text = detail.texts.get(f.path);
+    const tone = toneOf(text);
+    const token = tone ? firstLine(text) : "";
+    html += '<li><button type="button" class="file" data-file="' + esc(f.path) + '" data-key="file:' + esc(f.path) + '"'
+      + (f.path === detail.path ? ' aria-current="true"' : '') + (token ? ' title="' + esc(token) + '"' : '') + '>'
+      + '<span class="dot' + (tone ? " tone-" + tone : "") + '" aria-hidden="true"></span>' + esc(f.label)
+      + (token ? '<span class="sr">, ' + esc(token) + '</span>' : '') + '</button></li>';
+  }
+  return html + "</ul>";
+}
+
+// renderViewer keeps the scroll position unless a different file is shown.
+function renderViewer() {
+  const key = detail.id + "\n" + (detail.path || "");
+  let html;
+  if (!detail.loaded) html = '<p class="empty">Loading…</p>';
+  else if (!detail.path) html = '<p class="empty">This job has no files yet.</p>';
+  else {
+    const text = detail.texts.get(detail.path);
+    const file = detail.files.find(f => f.path === detail.path);
+    if (file && file.captures) html = evidenceHtml(file, text);
+    else html = typeof text === "string" ? '<div class="md">' + renderMarkdown(text) + '</div>' : '<p class="empty">This file is no longer there.</p>';
+  }
+  if (key === detail.viewerKey && html === viewerEl.lastHtml) return;
+  const scroll = key === detail.viewerKey ? viewerEl.scrollTop : 0;
+  viewerEl.innerHTML = html;
+  viewerEl.lastHtml = html;
+  // A relative link in a round file resolves against that file's own
+  // round-<n>/ folder, not this page's.
+  if (detail.path && folderOf(detail.path)) {
+    const folder = new URL(jobUrl(detail.id) + folderOf(detail.path), location.href);
+    for (const a of viewerEl.querySelectorAll("a[href]")) {
+      if (!a.getAttribute("href").startsWith("#")) a.href = new URL(a.getAttribute("href"), folder).href;
+    }
+  }
+  viewerEl.scrollTop = scroll;
+  detail.viewerKey = key;
+}
+
+// folderOf is the folder part of a path in the job folder, URL-encoded,
+// such as "round-1/" for "round-1/review-ux.md".
+function folderOf(path) {
+  return path.slice(0, path.lastIndexOf("/") + 1).split("/").map(encodeURIComponent).join("/");
+}
+
+// evidenceHtml is an evidence folder in the viewer: its index.md, then each
+// capture, png and jpg as an image and webm and mp4 as a video.
+function evidenceHtml(file, index) {
+  const folder = jobUrl(detail.id) + folderOf(file.path);
+  const captures = file.captures.map(name => {
+    const src = esc(folder + encodeURIComponent(name));
+    const label = esc(file.key + " evidence " + name);
+    return '<figure>' + (/\.(?:webm|mp4)$/.test(name)
+      ? '<video controls preload="metadata" src="' + src + '" aria-label="' + label + '"></video>'
+      : '<img src="' + src + '" alt="' + label + '">')
+      + '<figcaption>' + esc(name) + '</figcaption></figure>';
+  });
+  return '<div class="md">' + (typeof index === "string" ? renderMarkdown(index) : '<p class="empty">No index.md</p>') + '</div>'
+    + (captures.length ? '<div class="evidence">' + captures.join("") + '</div>' : '');
+}
+
+function openJob(id) {
+  if (detail.id !== id) {
+    Object.assign(detail, { id, path: null, files: [], texts: new Map(), loaded: false, viewerKey: "" });
+  }
+  panelEl.hidden = false;
+  renderDetail();
+  $("panel-title").focus();
+  refreshDetail().then(renderDetail, err => { view.error = err.message; renderStatus(); });
+}
+
+function closePanel() {
+  if (!detail.id) return;
+  const id = detail.id;
+  detail.id = null;
+  panelEl.hidden = true;
+  const opener = document.querySelector('[data-open="' + CSS.escape(id) + '"]');
+  if (opener) opener.focus();
+}
+
+// ---------- markdown ----------
+// A small renderer that escapes all text first and only then adds the
+// handful of tags it knows, so no file can inject markup.
+
+const FENCE_RE = /^\s{0,3}(`{3,}|~{3,})/;
+const HEADING_RE = /^\s{0,3}(#{1,6})\s+(.*?)(?:\s+#+)?\s*$/;
+const HR_RE = /^\s{0,3}([-*_])(?:\s*\1){2,}\s*$/;
+const QUOTE_RE = /^\s{0,3}>/;
+const LIST_RE = /^(\s*)([-*+]|\d{1,9}[.)])\s+(.*)$/;
+const TABLE_SEP_RE = /^\s*\|?\s*:?-+:?\s*(\|\s*:?-+:?\s*)*\|?\s*$/;
+
+function renderMarkdown(source) {
+  const lines = source.replace(/^﻿/, "").replace(/\r\n?/g, "\n").replace(/\u0000/g, "").split("\n");
+  const tone = TONES[lines[0].trim()];
+  if (tone) return '<p class="badge tone-' + tone + '">' + esc(lines[0].trim()) + '</p>' + renderBlocks(lines.slice(1));
+  return renderBlocks(lines);
+}
+
+function isTableStart(lines, i) {
+  return lines[i].includes("|") && i + 1 < lines.length && lines[i + 1].includes("|") && TABLE_SEP_RE.test(lines[i + 1]);
+}
+
+function startsBlock(lines, i) {
+  const line = lines[i];
+  return FENCE_RE.test(line) || HEADING_RE.test(line) || HR_RE.test(line) || QUOTE_RE.test(line)
+    || LIST_RE.test(line) || isTableStart(lines, i);
+}
+
+function renderBlocks(lines) {
+  const out = [];
+  let i = 0;
+  while (i < lines.length) {
+    const line = lines[i];
+    let m;
+    if (!line.trim()) {
+      i++;
+    } else if ((m = FENCE_RE.exec(line))) {
+      const fence = m[1];
+      const body = [];
+      i++;
+      while (i < lines.length && !lines[i].trim().startsWith(fence)) body.push(lines[i++]);
+      i++; // the closing fence
+      out.push("<pre><code>" + esc(body.join("\n")) + "</code></pre>");
+    } else if ((m = HEADING_RE.exec(line))) {
+      const level = m[1].length;
+      out.push("<h" + level + ">" + inline(m[2]) + "</h" + level + ">");
+      i++;
+    } else if (HR_RE.test(line)) {
+      out.push("<hr>");
+      i++;
+    } else if (QUOTE_RE.test(line)) {
+      const inner = [];
+      while (i < lines.length && QUOTE_RE.test(lines[i])) inner.push(lines[i++].replace(/^\s{0,3}> ?/, ""));
+      out.push("<blockquote>" + renderBlocks(inner) + "</blockquote>");
+    } else if (isTableStart(lines, i)) {
+      i = renderTable(lines, i, out);
+    } else if (LIST_RE.test(line)) {
+      i = renderList(lines, i, out);
+    } else {
+      const para = [lines[i++].trim()];
+      while (i < lines.length && lines[i].trim() && !startsBlock(lines, i)) para.push(lines[i++].trim());
+      out.push("<p>" + inline(para.join(" ")) + "</p>");
+    }
+  }
+  return out.join("\n");
+}
+
+function splitRow(line) {
+  let s = line.trim();
+  if (s.startsWith("|")) s = s.slice(1);
+  if (s.endsWith("|") && !s.endsWith("\\|")) s = s.slice(0, -1);
+  return s.split(/(?<!\\)\|/).map(c => c.trim().replace(/\\\|/g, "|"));
+}
+
+function renderTable(lines, i, out) {
+  const head = splitRow(lines[i]);
+  const aligns = splitRow(lines[i + 1]).map(c =>
+    c.startsWith(":") && c.endsWith(":") ? "center" : c.endsWith(":") ? "right" : "");
+  i += 2;
+  const rows = [];
+  while (i < lines.length && lines[i].trim() && lines[i].includes("|")) rows.push(splitRow(lines[i++]));
+  const cell = (tag, text, k) => "<" + tag + (aligns[k] ? ' style="text-align:' + aligns[k] + '"' : "") + ">" + inline(text) + "</" + tag + ">";
+  out.push('<div class="table-wrap"><table><thead><tr>' + head.map((c, k) => cell("th", c, k)).join("") + "</tr></thead><tbody>"
+    + rows.map(r => "<tr>" + head.map((_, k) => cell("td", r[k] || "", k)).join("") + "</tr>").join("")
+    + "</tbody></table></div>");
+  return i;
+}
+
+// renderList gathers consecutive list lines (with lazy continuation lines
+// and blank lines between items) and nests them by indentation.
+function renderList(lines, i, out) {
+  const items = [];
+  while (i < lines.length) {
+    const line = lines[i];
+    const m = LIST_RE.exec(line);
+    if (m) {
+      items.push({ indent: m[1].replace(/\t/g, "    ").length, ordered: /\d/.test(m[2]), start: parseInt(m[2], 10), text: m[3] });
+      i++;
+    } else if (line.trim() && !startsBlock(lines, i)) {
+      items[items.length - 1].text += " " + line.trim();
+      i++;
+    } else if (!line.trim()) {
+      let j = i;
+      while (j < lines.length && !lines[j].trim()) j++;
+      if (j < lines.length && LIST_RE.test(lines[j])) i = j;
+      else break;
+    } else {
+      break;
+    }
+  }
+  out.push(listHtml(items));
+  return i;
+}
+
+function listHtml(items) {
+  let html = "";
+  const stack = []; // open lists: { indent, tag }
+  for (const item of items) {
+    const tag = item.ordered ? "ol" : "ul";
+    const open = tag + (item.ordered && item.start !== 1 ? ' start="' + item.start + '"' : "");
+    while (stack.length && item.indent < stack[stack.length - 1].indent) html += "</li></" + stack.pop().tag + ">";
+    const top = stack[stack.length - 1];
+    if (!top || item.indent > top.indent) {
+      html += "<" + open + ">";
+      stack.push({ indent: item.indent, tag });
+    } else {
+      html += "</li>";
+      if (top.tag !== tag) {
+        html += "</" + top.tag + "><" + open + ">";
+        top.tag = tag;
+      }
+    }
+    html += itemHtml(item.text);
+  }
+  while (stack.length) html += "</li></" + stack.pop().tag + ">";
+  return html;
+}
+
+function itemHtml(text) {
+  const task = /^\[([ xX])\](?:\s+(.*))?$/.exec(text);
+  if (!task) return "<li>" + inline(text);
+  const done = task[1] !== " ";
+  return '<li class="task"><input type="checkbox" disabled' + (done ? " checked" : "") + ' aria-label="' + (done ? "done" : "to do") + '">'
+    + inline(task[2] || "");
+}
+
+// inline escapes the text, then adds code spans, safe links, bold and italic.
+// Finished pieces are held behind \u0000n\u0000 markers so later steps
+// cannot touch them.
+function inline(text) {
+  const held = [];
+  const hold = html => "\u0000" + (held.push(html) - 1) + "\u0000";
+  let s = esc(text);
+  s = s.replace(/`([^`]+)`/g, (_, code) => hold("<code>" + code + "</code>"));
+  s = s.replace(/\[([^\]]*)\]\(\s*([^\s)]+)\s*\)/g, (whole, label, href) => {
+    if (!safeHref(unesc(href))) return whole; // left as plain, escaped text
+    const target = href.startsWith("#") ? "" : ' target="_blank"';
+    return hold('<a href="' + href + '"' + target + ' rel="noopener">' + emphasis(label) + "</a>");
+  });
+  s = emphasis(s);
+  for (let k = 0; k < 3 && s.includes("\u0000"); k++) s = s.replace(/\u0000(\d+)\u0000/g, (_, n) => held[n]);
+  return s;
+}
+
+function emphasis(s) {
+  return s
+    .replace(/\*\*(?=\S)([\s\S]*?\S)\*\*/g, "<strong>$1</strong>")
+    .replace(/(^|\W)__(?=\S)([\s\S]*?\S)__(?!\w)/g, "$1<strong>$2</strong>")
+    .replace(/(^|[^*\w])\*(?=[^\s*])([^*]*?[^\s*])?\*(?![*\w])/g, (m, pre, body) => body === undefined ? m : pre + "<em>" + body + "</em>")
+    .replace(/(^|\W)_(?=\S)([^_]*?\S)_(?!\w)/g, "$1<em>$2</em>");
+}
+
+// Links may only go to http(s), relative paths or #anchors.
+function safeHref(href) {
+  const plain = href.replace(/[\u0000- \u007f]/g, "");
+  if (plain.startsWith("#")) return true;
+  const scheme = /^([a-z][a-z0-9+.-]*):/i.exec(plain);
+  if (scheme) return /^https?$/i.test(scheme[1]);
+  return !plain.startsWith("//") && !plain.startsWith("\\");
+}
+
+// ---------- events ----------
+
+document.addEventListener("click", event => {
+  const opener = event.target.closest("[data-open]");
+  if (opener) { openJob(opener.dataset.open); return; }
+  const file = event.target.closest("[data-file]");
+  if (file && detail.id) {
+    detail.path = file.dataset.file;
+    renderDetail();
+  }
+});
+
+document.addEventListener("keydown", event => {
+  if (event.key === "Escape" && detail.id) {
+    event.preventDefault();
+    closePanel();
+  }
+});
+
+$("panel-close").addEventListener("click", closePanel);
+document.addEventListener("visibilitychange", () => { if (!document.hidden) render(); });
+
+render();
+poll();
+</script>
+</body>
+</html>

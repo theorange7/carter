@@ -1,0 +1,61 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git status *)",
+      "Bash(git log *)",
+      "Bash(git diff *)",
+      "Bash(git rev-parse *)",
+      "Bash(git merge-tree *)",
+      "Bash(git branch --show-current)",
+      "Bash(git branch -d factory/*)",
+      "Bash(git worktree add -b factory/*)",
+      "Bash(git worktree remove *)",
+      "Bash(git add *)",
+      "Bash(git add docs/spikes/*)",
+      "Bash(git commit *)",
+      "Bash(git merge --no-ff factory/*)",
+      "Bash(git merge --abort)",
+      "Bash(agent-browser *)",
+      "Bash(cd *)",
+      "Bash(mkdir -p factory/jobs)",
+      "Bash(mkdir factory/jobs/*)",
+      "Bash(mv factory/inbox/* factory/jobs/*)",
+      "Bash(test -f factory/inbox/*)",
+      "Bash(date -u *)",
+      "Bash(echo *)",
+      "Bash(factory/ci.sh *)"
+    ],
+    "deny": [
+      "Bash(git log --outp*)",
+      "Bash(git log * --outp*)",
+      "Bash(git diff --outp*)",
+      "Bash(git diff * --outp*)",
+      "Bash(git commit --no-veri*)",
+      "Bash(git commit * --no-veri*)",
+      "Bash(git commit -n*)",
+      "Bash(git commit * -n*)",
+      "Bash(git commit --am*)",
+      "Bash(git commit * --am*)",
+      "Bash(git worktree remove --f*)",
+      "Bash(git worktree remove * --f*)",
+      "Bash(git worktree remove -f*)",
+      "Bash(git worktree remove * -f*)",
+      "Bash(mkdir *..*)",
+      "Bash(mv *..*)",
+      "Bash(test -f *..*)",
+      "Bash(git add docs/spikes/*..*)"
+    ]
+  },
+  "hooks": {
+    "SubagentStop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "[ ! -f \"$CLAUDE_PROJECT_DIR/factory/save-review.sh\" ] || sh \"$CLAUDE_PROJECT_DIR/factory/save-review.sh\""
+          }
+        ]
+      }
+    ]
+  }
+}
