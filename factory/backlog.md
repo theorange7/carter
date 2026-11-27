@@ -9,7 +9,7 @@ Factory's. For example, `- [ ] [L2] Add the export button after: L1, shop/L4`
 stays blocked until the lines `[L1] …` here and `[L4] …` in the Factory
 `shop` are claimed by Jobs that have merged.
 
-- [ ] [BOOT] Write the AGENTS.md factory section
+- [x] [BOOT] Write the AGENTS.md factory section → 001-agents-factory-section
 
 Source: docs/specs/delivery-atlas-v0.1.md. Scopes and acceptance criteria: docs/delivery-atlas-work-breakdown.md.
 
