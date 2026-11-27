@@ -11,9 +11,12 @@ stays blocked until the lines `[L1] …` here and `[L4] …` in the Factory
 
 - [x] [BOOT] Write the AGENTS.md factory section → 001-agents-factory-section
 
+BOOT guidance has landed in `AGENTS.md`. DA01 is ready in a fresh clone; it
+does not require importing the completed bootstrap job’s ignored runtime state.
+
 Source: docs/specs/delivery-atlas-v0.1.md. Scopes and acceptance criteria: docs/delivery-atlas-work-breakdown.md.
 
-- [ ] [DA01] Establish an installable offline validation tracer bullet (see docs/delivery-atlas-work-breakdown.md section DA01) after: BOOT
+- [ ] [DA01] Establish an installable offline validation tracer bullet (see docs/delivery-atlas-work-breakdown.md section DA01)
 - [ ] [S1] spike: Does a one-tool stdio MCP adapter work in real Claude Code and Codex CLI, API-key mode first? (see docs/delivery-atlas-work-breakdown.md section S1) after: DA01
 - [ ] [S2] spike: Does the intended GitLab instance support runners, private Pages, serialised deployment and enforced approvals? (see docs/delivery-atlas-work-breakdown.md section S2) after: DA01
 - [ ] [DA02] Validate the complete roadmap and report actionable diagnostics (see docs/delivery-atlas-work-breakdown.md section DA02) after: DA01
