@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="light"><title>Carter — delivery, in perspective</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="shell">
+<aside class="sidebar">
+<a class="brand" href="#roadmap" aria-label="Carter home"><span class="brand-icon">c</span>carter<span class="brand-dot">.</span></a>
+<p class="workspace-label">YOUR WORKSPACE</p><div class="workspace-name"><span class="workspace-mark">W</span><div>Wayfinder studio<small>Fictional planning workspace</small></div></div>
+<nav aria-label="Workspace"><a class="nav-item active" href="#roadmap"><span></span> Roadmap <span class="nav-count">7</span></a><button class="nav-item" id="compare-nav"><span>⇄</span> Scenario comparison</button></nav>
+<div class="sidebar-note"><span class="small-label">A LITTLE ROOM TO THINK</span><p>Explore the change.<br>See what moves.<br>Decide together.</p><div class="hairline"></div><p class="muted">One shared picture.<br>Many possible paths.</p></div>
+<div class="sidebar-bottom"><span class="avatar">JD</span><div>Jamie Davis<small>Demo planner</small></div><span class="local-dot" title="Browser-local demo">●</span></div>
+</aside>
+<main id="roadmap">
+<header class="topbar"><div class="breadcrumb">Workspace <span>/</span> Platform roadmap</div><div class="topbar-actions"><span class="prototype-badge">INTERACTIVE PROTOTYPE</span><button id="reset" class="text-button" data-testid="reset">Reset demo</button></div></header>
+<section class="page-heading"><div><div class="eyebrow">PLANNING HORIZON · JAN — JUN 2027</div><h1>Delivery, in perspective.</h1><p>A shared view of what’s ahead. A safe space to ask <em>what if?</em></p></div><div class="heading-meta"><span class="avatar-stack"><i>MC</i><i>AM</i><i>SR</i></span><span>2 teams · 3 tracks<br><small>Fictional sample roadmap</small></span></div></section>
+<section class="scenario-strip" aria-label="Current scenario"><div><span class="scenario-symbol">/</span><div><span class="small-label">LOCAL SCENARIO</span><strong>Rehearsal + one week</strong></div><span class="scenario-pill">Exploring</span></div><button id="compare" class="text-button" data-testid="compare">Compare with baseline <span>↗</span></button></section>
+<div id="notice" tabindex="-1" class="notice" role="status" hidden></div>
+<section class="roadmap-card">
+<div class="card-toolbar"><div class="view-switch" role="group" aria-label="Roadmap view"><button data-view="timeline" class="selected" data-testid="timeline-view"> Timeline</button><button data-view="list" data-testid="list-view"> List</button></div><div class="filter-group"><label><span class="sr-only">Team</span><select id="team-filter" data-testid="team-filter"><option value="all">All teams</option></select></label><label><span class="sr-only">Track</span><select id="track-filter" data-testid="track-filter"><option value="all">All tracks</option></select></label><label><span class="sr-only">Time period</span><select id="time-filter" data-testid="time-filter"><option value="all">Jan – Jun 2027</option><option value="q1">Q1 · Jan – Mar</option><option value="q2">Q2 · Apr – Jun</option></select></label></div></div>
+<div class="roadmap-legend"><span><i class="legend-fill"></i> Scenario plan</span><span><i class="legend-outline"></i> Fixture baseline</span><span class="legend-tip">Select milestones to explore a change <span>↘</span></span></div>
+<div id="roadmap-content"></div>
+<div class="card-footer"><span id="record-count"></span><span>Dates are inclusive · no capacity calculation</span></div>
+</section>
+<section class="comparison-card" id="comparison" hidden aria-labelledby="comparison-title"><div class="section-title"><div><div class="eyebrow">SCENARIO COMPARISON</div><h2 id="comparison-title" tabindex="-1">A clear view of what changed.</h2></div><button id="close-compare" class="text-button" aria-label="Close comparison">Close ×</button></div><p class="muted">Compared with <strong>Fixture baseline · 04 Jan 2027</strong>. Browser records only; no Git branches or files are changed.</p><div id="comparison-content"></div></section>
+<footer class="page-footer"><span>Carter <span class="footer-dot">/</span> Make room for the next good decision.</span><span>Browser-local demo · no model or MCP connection</span></footer>
+</main>
+<aside class="context-panel" aria-label="Context and replies"><div class="panel-heading"><span class="eyebrow">CONTEXTUAL PLANNING</span><span class="panel-spark">+</span></div><div id="detail" tabindex="-1" aria-label="Milestone details"></div><section class="composer" aria-labelledby="reply-heading"><div class="composer-heading"><h2 id="reply-heading">Start with a question.</h2><span id="selection-count">0 selected</span></div><div id="chips" class="chips"></div><label class="sr-only" for="reply">Reply about selected roadmap items</label><textarea id="reply" rows="4" maxlength="2000" data-testid="reply-input" placeholder="What would change if we moved the rehearsal by one week?"></textarea><label class="preset-label" for="demo-mode">Simulation preset</label><select id="demo-mode" data-testid="demo-mode"><option value="shift">Move first dated selection +7 days</option><option value="conflict">Try dependency conflict (+35 days)</option></select><div class="composer-actions"><button id="example" class="text-button" data-testid="use-example">Use rehearsal example</button><button id="queue" class="primary-button" data-testid="queue-reply">Queue reply <span>↗</span></button></div><p class="microcopy">Select items, then queue. Processing starts only when you choose <strong>Run demo agent</strong>.</p></section><section class="history" aria-labelledby="history-heading"><div class="history-title"><h2 id="history-heading">The conversation</h2><span id="history-count">0</span></div><div class="simulation-note">SIMULATION ONLY <span>·</span> Presets move dates. Your text is retained as a note; no model interprets it.</div><div id="history-content"></div></section><div class="storage-note" id="storage-note">Saved in this browser. Not a production inbox.<br>Reset demo clears only Carter’s demo state.</div></aside>
+</div>
+<script src="model.js"></script><script src="app.js"></script>
+</body></html>

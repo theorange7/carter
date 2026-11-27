@@ -1,8 +1,8 @@
 # Carter
 
 Carter is a local, agent-assisted roadmap planning tool with optional GitLab
-sharing and publication. This checkout currently contains specifications and a
-vendored factory kit, with no application implementation yet.
+sharing and publication. This checkout contains specifications, a vendored factory kit and a
+browser-only interaction prototype. The production application is not implemented.
 
 Read these before changing product behavior:
 
@@ -19,10 +19,26 @@ decisions as an incidental part of another slice.
 
 ## Current setup and checks
 
-There is no application package manifest, dependency lock, test runner,
-lint/type-check runner or development server. No application installation,
-test, build or serve command is available yet. Markdown-only work requires no
-dependency installation.
+The [prototype guide](prototype/README.md) describes the working browser demo.
+Its local assets live under `prototype/`; it has no runtime dependencies and no
+model, MCP, service or Git/GitLab integration. From the repository root:
+
+```sh
+python3 -m http.server 5120 --bind 127.0.0.1 --directory prototype
+node prototype/model.test.cjs
+node --check prototype/model.js
+node --check prototype/app.js
+python3 prototype/bundle.py --output /tmp/carter-prototype.html
+```
+
+Open `http://127.0.0.1:5120/` or `prototype/index.html` directly. The bundle is a
+single offline HTML demo. Node is needed only for development checks, not to run
+the prototype. Real browser checks and captures must be recorded separately.
+
+There is no production package manifest, pinned toolchain, production test runner,
+lint/type-check runner or application development server. The prototype's browser
+localStorage and deterministic simulation do not satisfy production release
+criteria. Markdown-only work requires no dependency installation.
 
 From the job worktree, check whitespace before committing:
 
